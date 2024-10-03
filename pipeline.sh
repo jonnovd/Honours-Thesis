@@ -1,12 +1,11 @@
 #!/bin/bash
 
-#PBS -N profiler
+#PBS -N bracken
 #PBS -l walltime=12:00:00
 #PBS -l ncpus=16
-#PBS -l mem=150GB
+#PBS -l mem=100GB
 #PBS -e pipe.err
 #PBS -o pipe.out
-#PBS -q bix
 #PBS -M 25092936@sun.ac.za 
 #PBS -m ae
 
@@ -26,8 +25,8 @@ KRAKEN2_DB='/new-home/databases/kraken.db/standard'
 HOST_FASTA=''
 MQC_DIR='.'
 THREADS=16
-#READS_DIR=~/thesis/xiao/reads
-READS_DIR=~/thesis/pipeline-test/reads
+BASE_DIR=~/thesis/run2
+READS_DIR=$BASE_DIR/reads
 
 for dir in "$READS_DIR"/*; do
     echo "$dir" >> samples.txt
@@ -38,15 +37,15 @@ done
 # l = Minimum read length
 # Y = Minimum % sequence complexity
 # w = Threads
-echo ">> QC with fastp"
+echo ">> QC WITH FASTP"
 module load app/fastp/0.23.4
 if [[ ! -d fastp ]]; then
     mkdir fastp
     mkdir fastp-out
 fi
 for dir in "$READS_DIR"/*;do
-    R1=$(basename "$(ls $dir/*R1.*)")
-    R2=$(basename "$(ls $dir/*R2.*)")
+    R1=$(basename "$(ls $dir/*R1*)")
+    R2=$(basename "$(ls $dir/*R2*)")
     SAMPLE=$(awk -F'/' '{print $NF}' <<< $dir)
     if [[ ! -d "fastp/$SAMPLE" ]]; then
         mkdir "fastp/$SAMPLE"
@@ -68,9 +67,9 @@ for dir in "$READS_DIR"/*;do
 done
 module unload app/fastp/0.23.4
 
-QC_READS_DIR=~/thesis/pipeline-test/fastp
+QC_READS_DIR=$BASE_DIR/fastp
 
-echo ">> Host removal with Bowtie2"
+echo ">> HOST REMOVAL WITH BOWTIE2"
 module load app/bowtie/2.5.4
 if [[ ! -d 'GRCh38_noalt_as' ]]; then
     mkdir GRCh38_noalt_as
@@ -83,8 +82,8 @@ if [[ ! -d 'bowtie2' ]]; then
 fi
 
 for dir in "$QC_READS_DIR"/*;do
-    R1=$(ls $dir/*R1.*)
-    R2=$(ls $dir/*R2.*)
+    R1=$(ls $dir/*R1*)
+    R2=$(ls $dir/*R2*)
     SAMPLE=$(awk -F'/' '{print $NF}' <<< $dir)
     if [[ ! -d "bowtie2/$SAMPLE" ]]; then
         mkdir "bowtie2/$SAMPLE"
@@ -106,11 +105,11 @@ if [[ ! -d 'kraken2' ]]; then
     mkdir kraken2
 fi
 
-echo ">> Taxonomic Profiling with Kraken2"
+echo ">> TAXONOMIC PROFILING WITH KRAKEN2"
 module load app/kraken2/2.1.3
 for dir in bowtie2/*;do
-    R1=$(ls $dir/*R1.*)
-    R2=$(ls $dir/*R2.*)
+    R1=$(ls $dir/*R1*)
+    R2=$(ls $dir/*R2*)
     SAMPLE=$(awk -F'/' '{print $NF}' <<< $dir)
     if [[ ! -d "kraken2/$SAMPLE" ]]; then
         mkdir "kraken2/$SAMPLE"
@@ -118,16 +117,16 @@ for dir in bowtie2/*;do
 
     kraken2 --db $KRAKEN2_DB \
         --paired \
-        --classified-out $SAMPLE/${SAMPLE}_cseqs#.fq \
-        --unclassified-out $SAMPLE/${SAMPLE}_useqs#.fq $R1 $R2 \
-        --report kraken2/$SAMPLE/${SAMPLE}_kreport.txt \
+        --classified-out kraken2/$SAMPLE/hr_${SAMPLE}_cseqs#.fq \
+        --unclassified-out kraken2/$SAMPLE/hr_${SAMPLE}_useqs#.fq $R1 $R2 \
+        --report kraken2/$SAMPLE/hr_${SAMPLE}_kreport.txt \
         --threads $THREADS
 done
 if [[ ! -d 'bracken' ]]; then
     mkdir bracken
 fi
 
-echo ">> Abundance Estimation with Bracken"
+echo ">> ABUNDANCE RE-ESTIMATION WITH BRACKEN"
 module load app/bracken/2.7
 for dir in kraken2/*;do
     SAMPLE=$(awk -F'/' '{print $NF}' <<< $dir)
@@ -136,21 +135,22 @@ for dir in kraken2/*;do
     fi
 
     bracken -d $KRAKEN2_DB \
-        -i ${dir}${SAMPLE}_kreport.txt \
-        -o bracken/$SAMPLE/report.bracken \
+        -i kraken2/$SAMPLE/hr_${SAMPLE}_kreport.txt \
+        -o bracken/$SAMPLE/hr_$SAMPLE-report.bracken \
         -r 150
 done
 module unload app/bracken/2.7
 
-# echo ">> De novo Assembly with SPAdes"
-# module load app/SPAdes
-# # SPADES - Assembly of unclassified reads
-# spades.py \
-#     -1 \
-#     -2 \
-#     -o
-# module unload app/SPAdes
+# # echo ">> De novo Assembly with SPAdes"
+# # module load app/SPAdes
+# # # SPADES - Assembly of unclassified reads
+# # spades.py \
+# #     -1 \
+# #     -2 \
+# #     -o
+# # module unload app/SPAdes
 
-echo ">> Report with Multiqc"
+echo ">> REPORT WITH MULTIQC"
 module load app/multiqc/1.21
-multiqc $MQC_DIR
+multiqc kraken2/
+multiqc fastp-out/
