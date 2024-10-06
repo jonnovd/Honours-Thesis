@@ -1,9 +1,9 @@
 #!/bin/bash
 
 #PBS -N bracken
-#PBS -l walltime=12:00:00
-#PBS -l ncpus=16
-#PBS -l mem=100GB
+#PBS -l walltime=6:00:00
+#PBS -l ncpus=32
+#PBS -l mem=150GB
 #PBS -e pipe.err
 #PBS -o pipe.out
 #PBS -M 25092936@sun.ac.za 
@@ -24,8 +24,9 @@ cd $PBS_O_WORKDIR
 KRAKEN2_DB='/new-home/databases/kraken.db/standard'
 HOST_FASTA=''
 MQC_DIR='.'
-THREADS=16
-BASE_DIR=~/thesis/run2
+THREADS=32
+PATIENT=p096
+BASE_DIR=~/thesis/preterm/$PATIENT
 READS_DIR=$BASE_DIR/reads
 
 for dir in "$READS_DIR"/*; do
@@ -61,8 +62,8 @@ for dir in "$READS_DIR"/*;do
         -w $THREADS
         # --detect_adapter_for_pe \ Check if this is necessary because it always seems to fail to detect
     
-    mv fastp.json fastp-out/fastp-$SAMPLE.json
-    mv fastp.html fastp-out/fastp-$SAMPLE.html
+    mv fastp.json fastp-out/fastp-$PATIENT-$SAMPLE.json
+    mv fastp.html fastp-out/fastp-$PATIENT-$SAMPLE.html
 
 done
 module unload app/fastp/0.23.4
@@ -119,7 +120,7 @@ for dir in bowtie2/*;do
         --paired \
         --classified-out kraken2/$SAMPLE/hr_${SAMPLE}_cseqs#.fq \
         --unclassified-out kraken2/$SAMPLE/hr_${SAMPLE}_useqs#.fq $R1 $R2 \
-        --report kraken2/$SAMPLE/hr_${SAMPLE}_kreport.txt \
+        --report kraken2/$SAMPLE/hr-$PATIENT-$SAMPLE-kreport.txt \
         --threads $THREADS
 done
 if [[ ! -d 'bracken' ]]; then
@@ -135,8 +136,8 @@ for dir in kraken2/*;do
     fi
 
     bracken -d $KRAKEN2_DB \
-        -i kraken2/$SAMPLE/hr_${SAMPLE}_kreport.txt \
-        -o bracken/$SAMPLE/hr_$SAMPLE-report.bracken \
+        -i kraken2/$SAMPLE/hr-$PATIENT-$SAMPLE-kreport.txt \
+        -o bracken/$SAMPLE/hr-$PATIENT-$SAMPLE-report.bracken \
         -r 150
 done
 module unload app/bracken/2.7
