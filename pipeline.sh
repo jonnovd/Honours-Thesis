@@ -72,10 +72,10 @@ QC_READS_DIR=$BASE_DIR/fastp
 
 echo ">> HOST REMOVAL WITH BOWTIE2"
 module load app/bowtie/2.5.4
-if [[ ! -d 'GRCh38_noalt_as' ]]; then
-    mkdir GRCh38_noalt_as
-    bowtie2-build $HOST_FASTA GRCh38_noalt_as --threads $THREADS
-    mv *.bt2 GRCh38_noalt_as
+if [[ ! -d '../GRCh38_noalt_as' ]]; then
+    mkdir ../GRCh38_noalt_as
+    bowtie2-build $HOST_FASTA ../GRCh38_noalt_as --threads $THREADS
+    mv *.bt2 ../GRCh38_noalt_as
 fi
 
 if [[ ! -d 'bowtie2' ]]; then
@@ -90,7 +90,7 @@ for dir in "$QC_READS_DIR"/*;do
         mkdir "bowtie2/$SAMPLE"
     fi
 
-    bowtie2 -p 16 -x GRCh38_noalt_as/GRCh38_noalt_as \
+    bowtie2 -p 16 -x ../GRCh38_noalt_as/GRCh38_noalt_as \
         -1 $R1 \
         -2 $R2 \
         --very-sensitive-local \
