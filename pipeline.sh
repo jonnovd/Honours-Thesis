@@ -153,5 +153,5 @@ module unload app/bracken/2.7
 
 echo ">> REPORT WITH MULTIQC"
 module load app/multiqc/1.21
-multiqc kraken2/
-multiqc fastp-out/
+multiqc kraken2/. -o kraken2
+multiqc fastp-out/. -o fastp-out
