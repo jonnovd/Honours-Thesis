@@ -184,6 +184,7 @@ df_meta <- meta[meta$Treatment == "AB",]
 df_meta
 simpson <- simp[names(simp) %in% df_meta$sample]
 simpson
+Simp.plot <- cbind.data.frame(simpson,df_meta)
 
 df_ftest <- cbind.data.frame(simpson,df_meta)
 df_ftest$patient <- sapply(strsplit(df_meta$sample, "-"), `[`, 1)
@@ -202,47 +203,114 @@ pwc <- pwc %>% add_xy_position(x = "Timepoint")
 pwc$Timepoint <- "T1"
 pwc
 
-ggplot(Simp.plot, aes(x=Timepoint, y=simp_ab, fill = Timepoint, shape = Timepoint)) + theme_bw() +
+ggplot(Simp.plot, aes(x=Timepoint, y=simpson, fill = Timepoint, shape = Timepoint)) + theme_bw() +
   geom_boxplot(outlier.color = "red", outlier.size = 3, outlier.shape = 8) +
   geom_point(position=position_jitterdodge()) + 
-  #scale_color_manual(values=c("purple","turquoise", "lightgreen", "lightblue"))+
-  #scale_shape_manual(values=c(21,22)) + 
   scale_fill_manual(values=c("purple","turquoise", "lightgreen", "lightblue")) + 
   ylab("Inverse Simpson Diversity Index")+ 
   xlab(label = "Timepoint") +
-  ggtitle(label = "Simpson Diversity - Antibiotics") +
+  ggtitle(label = "Antibiotics") +
+  scale_y_continuous(breaks = c(2.5, 5, 7.5, 10, 12.5)) +
   theme(plot.title = element_text(hjust=0.5))+
   theme(axis.text.x=element_markdown(face="bold",size=10),
-        axis.text.y=element_markdown(face="bold",size=14),
-        legend.text=element_text(size=10),
-        legend.title=element_text(size=10)) +
-  theme(legend.spacing.y=unit(0.5,"cm"))+
+        axis.text.y=element_markdown(face="bold",size=14)) +
   theme(axis.title.x=element_markdown(face="bold",size=14),
-        axis.title.y=element_markdown(face="bold",size=14)) +
-  stat_pvalue_manual(pwc, hide.ns = FALSE) +
-  labs(
-    subtitle = get_test_label(res.fried,  detailed = TRUE),
-    caption = get_pwc_label(pwc)
-  )
+        axis.title.y=element_markdown(face="bold",size=14),
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+        legend.position = "none") 
+  #stat_pvalue_manual(pwc, hide.ns = FALSE) +
+  #labs(
+   # subtitle = get_test_label(res.fried,  detailed = TRUE),
+   # caption = get_pwc_label(pwc)
+  #)
 
-# CHANGE IN DIVERSITY
+# CHANGE IN DIVERSITY STATISTICAL TEST
 
 df_ab <- meta[meta$Treatment == "AB",]
 df_ab
-simpson <- simp[names(simp) %in% df_ab$sample]
-simpson
-df_simp <- cbind.data.frame(simpson,df_ab)
-df_simp
+simpson_ab <- simp[names(simp) %in% df_ab$sample]
+simpson_ab
+df_simp_ab <- cbind.data.frame(simpson_ab,df_ab)
+df_simp_ab <- rownames_to_column(df_simp_ab, var = "Sample")
+df_simp_ab
+df_simp_ab$Patient <- sapply(strsplit(df_simp_ab$Sample, "-"), `[`, 1)
 
-t2_ab <- df_simp[df_simp$Timepoint == "T2" ,]
-avg_simp_t2_ab <- mean(t2_ab$simpson)
-avg_simp_t2_ab
-t1_ab <- df_simp[df_simp$Timepoint == "T1" ,]
-avg_simp_t1_ab <- mean(t1_ab$simpson)
-avg_simp_t1_ab
+df_simp_ab_t1 <- df_simp_ab[df_simp_ab$Timepoint == "T1", ]
+df_simp_ab_t2 <- df_simp_ab[df_simp_ab$Timepoint == "T2", ]
 
-change_ab <- avg_simp_t2_ab - avg_simp_t1_ab
-change_ab
+df_simp_ab_t1 <- df_simp_ab_t1[order(df_simp_ab_t1$Patient), ]
+df_simp_ab_t2 <- df_simp_ab_t2[order(df_simp_ab_t2$Patient), ]
+
+# Calculate differences between T2 and T1 for each patient
+df_simp_diff_ab <- data.frame(
+  Patient = df_simp_ab_t1$Patient,
+  T2minusT1 = df_simp_ab_t2$simpson_ab - df_simp_ab_t1$simpson_ab
+)
+
+df_simp_diff_ab
+
+df_control <- meta[meta$Treatment == "CONTROL",]
+df_control
+simpson_control <- simp[names(simp) %in% df_control$sample]
+simpson_control
+df_simp_control <- cbind.data.frame(simpson_control,df_control)
+df_simp_control <- rownames_to_column(df_simp_control, var = "Sample")
+df_simp_control
+df_simp_control$Patient <- sapply(strsplit(df_simp_control$Sample, "-"), `[`, 1)
+
+df_simp_control_t1 <- df_simp_control[df_simp_control$Timepoint == "T1", ]
+df_simp_control_t2 <- df_simp_control[df_simp_control$Timepoint == "T2", ]
+
+df_simp_control_t1 <- df_simp_control_t1[order(df_simp_control_t1$Patient), ]
+df_simp_control_t2 <- df_simp_control_t2[order(df_simp_control_t2$Patient), ]
+
+# Calculate differences between T2 and T1 for each patient
+df_simp_diff_control <- data.frame(
+  Patient = df_simp_control_t1$Patient,
+  T2minusT1 = df_simp_control_t2$simpson_control - df_simp_control_t1$simpson_control
+)
+
+df_simp_diff_control
+
+wilcox_result <- wilcox.test(
+  df_simp_diff_ab$T2minusT1, 
+  df_simp_diff_control$T2minusT1,
+  alternative = "less"  # Can be "two.sided", "greater", or "less"
+)
+
+# View the results
+wilcox_result
+
+# Load the ggplot2 library if not already loaded
+library(ggplot2)
+
+# Combine the difference data into one dataframe
+df_simp_diff_ab$Treatment <- "Antibiotic"
+df_simp_diff_control$Treatment <- "Control"
+df_simp_diff_combined <- rbind(df_simp_diff_ab, df_simp_diff_control)
+
+# Boxplot with ggplot2
+p <- ggplot(df_simp_diff_combined, aes(x = Treatment, y = T2minusT1, fill = Treatment)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(width = 0.2, alpha = 0.5) +
+  labs(title = "Change in Diversity from Baseline to Treatment Cessation",
+       y = "Change in Inverse Simpson Diversity Index (T2 - T1)") +
+  theme_bw() +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+    axis.text.x = element_markdown(face = "bold", size = 10),
+    axis.text.y = element_markdown(face = "bold", size = 14),
+    axis.title.x = element_markdown(face = "bold", size = 14),
+    axis.title.y = element_markdown(face = "bold", size = 14)
+  )
+
+# Add significance annotation based on Wilcoxon test result
+p + annotate("text", x = 1.5, y = max(df_simp_diff_combined$T2minusT1) * 1.1,
+             label = paste("Wilcoxon p-value:", round(wilcox_result$p.value, 3)),
+             size = 4)
+
+
 
 #PCOA USING GGPLOT
 
@@ -496,28 +564,26 @@ plot$Species <- factor(plot$Species, levels=rev(levels(plot$Species)))
 ggplot(plot, aes(fill = Species, y = mean_abundance, x = Timepoint)) +
   geom_bar(position = position_fill(reverse = TRUE), stat = "identity", width = 0.5) +
   scale_fill_manual(values = c(
-  "#1f78b4", # Proteobacteria
+  "#1f78b4", # S marcescens
   "grey",
-  "lightblue",
-   #"#33a02c", # Bacteroidetes
-  "#ff7f00", # Firmicutes
-  "#6a3d9a", # Cyanobacteria
-  "red", # Verrucomicrobia
-  "#ffff99", # Chloroflexi
-  "#a6cee3", # Planctomycetes
-  "#fb9a99", # Nitrospirae
-  "#cab2d6", # Candidatus Gracilibacteria
-  "#fdbf6f", # Gemmatimonadetes
-  "#b2df8a", # Fusobacteria
-  "#ff33a3", # Euryarchaeota
-  "#c994c7", # Candidatus Saccharibacteria
-  "purple", # Acidobacteria
-  "#8dd3c7", # Mint Green
-  "#ffcc00", # Bright Yellow
-  "#d95f02", # Dark Orange
-  "#7570b3", # Purple
-  "#e7298a", # Hot Pink
+  "darkgreen",
+  "lightgreen",
+  "blue",
+  "#ff7f00",
+  "red", 
+  "pink",
+  "#ff33a3",
+  "purple",
+  "yellow2",
+  "turquoise",
   "#66a61e",
+  "coral3",
+  "lightblue",
+  "#ffcc00",
+  "#d95f02",
+  "#7570b3",
+  "#e7298a",
+  "#ffff99",
   "lightgreen",
   "lightblue",
   "blue",
@@ -529,14 +595,14 @@ ggplot(plot, aes(fill = Species, y = mean_abundance, x = Timepoint)) +
   guides(fill = guide_legend(ncol = 1, byrow = FALSE, face = "italic")) +
   xlab("Timepoint") +
   ylab("Mean Relative Abundance (%)") +
-  labs(title = "Mean Microbial Relative Abundance", fill = "Species") +
+  #labs(title = "Mean Microbial Relative Abundance", fill = "Species") +
   theme(
-    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 12),
-    axis.text.y = element_markdown(face = "bold", size = 20),
+    axis.text.x = element_text(face = "bold", angle = 90, vjust = 0.5, hjust = 1, size = 12),
+    axis.text.y = element_markdown(face = "bold", size = 13),
     legend.text = element_text(size = 14, face = "italic"),
-    legend.title = element_text(face = "bold", size = 20),
-    axis.title.x = element_markdown(face = "bold", size = 20),
-    axis.title.y = element_markdown(face = "bold", size = 20),
+    legend.title = element_text(face = "bold", size = 15),
+    axis.title.x = element_markdown(face = "bold", size = 16, margin = margin(t = 10)),
+    axis.title.y = element_markdown(face = "bold", size = 16, margin = margin(r = 10)),
     plot.title = element_text(face = "bold", size = 20),
     legend.spacing.y = unit(0.5, "cm")
   ) +
@@ -729,36 +795,43 @@ generate_heatmap_by_treatment <- function(data, treatment_group) {
   rownames(heatmap_matrix_filtered) <- heatmap_matrix_filtered[, 1]  # First column contains Sample_Timepoint
   heatmap_matrix_filtered <- heatmap_matrix_filtered[, -1]  # Remove the combined Sample_Timepoint column
   
-  ordered_indices <- order(rownames(heatmap_matrix_filtered))
-  heatmap_matrix_filtered <- heatmap_matrix_filtered[ordered_indices, ]
+  #ordered_indices <- order(rownames(heatmap_matrix_filtered))
+  #heatmap_matrix_filtered <- heatmap_matrix_filtered[ordered_indices, ]
+  species_order <- c("Serratia marcescens", "Moraxella catarrhalis", "Moraxella nonliquefaciens", 
+                     "Escherichia coli", "Klebsiella pneumoniae", "Staphylococcus epidermidis", 
+                     "Cutibacterium acnes", "Enterobacter hormaechei", "Streptococcus mitis",
+                     "Staphylococcus aureus", "Streptococcus pneumoniae", "Streptococcus oralis",
+                     "Dolosigranulum pigrum", "Gemella haemolysans", "Rothia mucilaginosa")
+  
+  heatmap_matrix_filtered <- heatmap_matrix_filtered[, species_order, drop = FALSE]
  
   # Extract sample names and timepoints
   samples <- sapply(strsplit(rownames(heatmap_matrix_filtered), "-"), `[`, 1)
   timepoints <- sapply(strsplit(rownames(heatmap_matrix_filtered), "_"), `[`, 2)
   
   # Create a dataframe for annotation that separates samples
-  annotation_df <- data.frame(Patient = samples, Timepoint = timepoints)
+  #annotation_df <- data.frame(Patient = samples, Timepoint = timepoints)
+  #rownames(annotation_df) <- rownames(heatmap_matrix_filtered)
+  annotation_df <- data.frame(Timepoint = timepoints)
   rownames(annotation_df) <- rownames(heatmap_matrix_filtered)
   
   # Define colors for each timepoint (this will visually separate timepoints)
   timepoint_colors <- list(Timepoint = c("T1" = "white", "T2" = "grey80", "T4" = "grey60", "T6" = "grey40"))
-  
-  # Generate the heatmap with row annotations
-  main_title <- sprintf("Relative Abundance Heatmap of %s Group", treatment_group)
   # Calculate relative abundance per sample (column-wise normalization)
   heatmap_matrix_relative <- sweep(heatmap_matrix_filtered, 1, rowSums(heatmap_matrix_filtered), "/")
   
   # Generate the heatmap without row scaling
   pheatmap(
     heatmap_matrix_relative,
-    cluster_rows = FALSE,     # Don't cluster rows (species)
-    cluster_cols = TRUE,      # Cluster columns (samples)
+    cluster_rows = FALSE,
+    cluster_cols = FALSE,
     annotation_row = annotation_df,
     annotation_colors = timepoint_colors,
     show_rownames = FALSE,     # Hide sample names
     show_colnames = TRUE,     # Show species names
-    color = colorRampPalette(c("white", "coral", "firebrick3"))(50),  # Define color scale
-    main = main_title,
+    fontsize_col = 12,
+    color = colorRampPalette(c("grey97", "coral", "firebrick3"))(50),  # Define color scale
+    #main = sprintf("Relative Abundance Heatmap of %s Group", treatment_group),
     gaps_row = cumsum(table(samples)),  # Create gaps between different samples
     border_color = "black",
   )
@@ -787,14 +860,15 @@ taxa_top_n <- taxa.filtered.relab.2[rownames(taxa.filtered.relab.2) %in% top_spe
 # Create a data frame for heatmap
 heatmap_data <- as.data.frame(t(taxa_top_n))
 heatmap_data <- rownames_to_column(heatmap_data, var = "sample")
+colnames(heatmap_data) <- gsub("\\.", " ", colnames(heatmap_data))
 colnames(heatmap_data)
 meta
 #meta$Sample <- rownames(meta)
 heatmap_data <- merge(heatmap_data, meta[, c("sample", "Treatment", "Timepoint")], by = "sample")
 colnames(heatmap_data)
 
-heatmap_data_no_Sm <- heatmap_data[, -16]
-colnames(heatmap_data_no_Sm)
+#heatmap_data_no_Sm <- heatmap_data[, -16]
+#colnames(heatmap_data_no_Sm)
 
 dim(heatmap_data)
 # Subset the data by Treatment group (Control and Antibiotics)
@@ -807,6 +881,71 @@ generate_heatmap_by_treatment(control_data, "Control")
 
 # Generate heatmap for Antibiotics group, sorted by timepoints
 generate_heatmap_by_treatment(antibiotics_data, "Antibiotics")
+
+
+
+
+# Antimicrobial Resistance Analysis
+
+setwd("/Users/jonathan/Documents/Honours/thesis/pipeline/public-data/preterm/amr")
+amr_table <- read.csv("summary.tab",header = T,row.names = 1, sep = "\t", check.names=FALSE)
+amr_table <- as.data.frame(amr_table)
+amr_table$Patient <- sapply(strsplit(sapply(strsplit(rownames(amr_table), "-"), `[`, 1), "/"), `[`, 2)
+amr_table
+# Load the libraries
+library(gt)
+library(webshot2)
+
+# Convert your data frame to a gt table
+#amr_table_gt <- gt(amr_table)
+selected_columns <- amr_table[, c("Patient", "blaSST-1", "aac(6')_Serra", "blaZ", "tet(41)"), drop = FALSE]
+amr_table_gt <- gt(selected_columns)
+amr_table_gt
+
+# Customize the table (optional)
+amr_table_gt <- amr_table_gt %>%
+  fmt_number(
+    columns = everything(),
+    decimals = 2
+  ) %>%
+  cols_move_to_start(
+    columns = "Patient"
+  ) %>%
+  tab_spanner(
+    label = "Genes",
+    columns = c(`blaSST-1`, `aac(6')_Serra`, `blaZ`, `tet(41)`)
+  ) %>%
+  tab_style(
+    style = cell_borders(
+      sides = "right",
+      color = "grey",
+      weight = px(1)
+    ),
+    locations = cells_body(columns = everything())
+  ) %>%
+  tab_style(
+    style = cell_text(
+      align = "center"
+    ),
+    locations = cells_body(columns = everything())
+  ) %>%
+  tab_options(
+    table.width = px(800),
+    table.border.top.color = "black",
+    table.border.bottom.color = "black"
+  ) %>%
+  cols_width(
+    everything() ~ px(50)
+  )
+
+amr_table_gt
+
+#gtsave(amr_table_gt, "amr_table.png", expand = 10)
+
+
+
+
+
 
 
 #### UNUSED CODE
@@ -917,3 +1056,4 @@ dim(taxa.bray.relab)
 pcoa.taxa<-pcoa(taxa.bray.relab)
 pcoa.taxa$values
 biplot(pcoa.taxa)
+
