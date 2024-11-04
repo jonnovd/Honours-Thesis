@@ -19,8 +19,6 @@ cd $PBS_O_WORKDIR
 # module avail app/kraken2 >> module_versions.txt 2>&1
 # module avail app/bracken >> module_versions.txt 2>&1
 # module avail app/multiqc >> module_versions.txt 2>&1
-
-
 KRAKEN2_DB='/new-home/databases/kraken.db/standard'
 HOST_FASTA=''
 MQC_DIR='.'
@@ -77,11 +75,9 @@ if [[ ! -d '../GRCh38_noalt_as' ]]; then
     bowtie2-build $HOST_FASTA ../GRCh38_noalt_as --threads $THREADS
     mv *.bt2 ../GRCh38_noalt_as
 fi
-
 if [[ ! -d 'bowtie2' ]]; then
     mkdir bowtie2
 fi
-
 for dir in "$QC_READS_DIR"/*;do
     R1=$(ls $dir/*R1*)
     R2=$(ls $dir/*R2*)
@@ -102,11 +98,10 @@ for dir in "$QC_READS_DIR"/*;do
 done
 module unload app/bowtie2/2.5.3
 
+echo ">> TAXONOMIC PROFILING WITH KRAKEN2"
 if [[ ! -d 'kraken2' ]]; then
     mkdir kraken2
 fi
-
-echo ">> TAXONOMIC PROFILING WITH KRAKEN2"
 module load app/kraken2/2.1.3
 for dir in bowtie2/*;do
     R1=$(ls $dir/*R1*)
@@ -123,11 +118,11 @@ for dir in bowtie2/*;do
         --report kraken2/$SAMPLE/hr-$PATIENT-$SAMPLE-kreport.txt \
         --threads $THREADS
 done
+
+echo ">> ABUNDANCE RE-ESTIMATION WITH BRACKEN"
 if [[ ! -d 'bracken' ]]; then
     mkdir bracken
 fi
-
-echo ">> ABUNDANCE RE-ESTIMATION WITH BRACKEN"
 module load app/bracken/2.7
 for dir in kraken2/*;do
     SAMPLE=$(awk -F'/' '{print $NF}' <<< $dir)
@@ -142,16 +137,25 @@ for dir in kraken2/*;do
 done
 module unload app/bracken/2.7
 
-# # echo ">> De novo Assembly with SPAdes"
-# # module load app/SPAdes
-# # # SPADES - Assembly of unclassified reads
-# # spades.py \
-# #     -1 \
-# #     -2 \
-# #     -o
-# # module unload app/SPAdes
-
 echo ">> REPORT WITH MULTIQC"
 module load app/multiqc/1.21
 multiqc kraken2/. -o kraken2
 multiqc fastp-out/. -o fastp-out
+
+echo ">> ARG analysis with ABRicate"
+module load python/2.7.11
+module load app/megahit/1.0.4-beta-58b0995
+module load app/abricate/1.0.0
+module load app/NCBI/2.15.0+
+for dir in bowtie2/*;do
+    R1=$(ls $dir/*R1*)
+    R2=$(ls $dir/*R2*)
+    SAMPLE=$(awk -F'/' '{print $NF}' <<< $dir)
+    if [[ ! -d "abricate/$SAMPLE" ]]; then
+        mkdir "abricate/$SAMPLE"
+    fi
+    megahit -o abricate/$SAMPLE/mega-out -1 $R1 -2 $R2
+    
+    abricate abricate/$SAMPLE/mega-out/*.fa > results.tab
+    abricate --summary results.tab > summary.tab
+done
